@@ -8,7 +8,11 @@ You can also assign your own speed and latency.
 Run
 ---
 
-It's written in Go so you need to do:
+You can access the binaries prebuilt here:
+
+[releases/tag/0.1](https://github.com/olafura/turtleproxy/releases/tag/0.1)
+
+If you want to compile it yourself then it's easy. It's written in Go so you need to execute those commands:
 
 `go get`
 
@@ -23,7 +27,6 @@ to get the layout of your workspace right
 
 Future
 ------
-* Provide regular binary releases
 * Add support for speed and latency ranges
 * Add other connections to simulate
 * Possible introduce package loss
