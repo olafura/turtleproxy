@@ -27,7 +27,7 @@ to get the layout of your workspace right
 
 Future
 ------
-* Add support for speed and latency ranges
+* Add support for latency ranges
 * Add other connections to simulate
 * Possible introduce package loss
 
