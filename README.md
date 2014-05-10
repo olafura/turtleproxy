@@ -18,6 +18,9 @@ Instead of installing it you can also do:
 
 `go run turtleproxy.go`
 
+Read [How to Write Go Code](http://golang.org/doc/code.html)
+to get the layout of your workspace right
+
 Future
 ------
 * Provide regular binary releases
