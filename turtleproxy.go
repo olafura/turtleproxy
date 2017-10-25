@@ -7,18 +7,18 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
-	"math/rand"
 )
 
 type DelayReadCloser struct {
-	R            io.ReadCloser
-	speedstart   uint64
-	speedend     uint64
-	starttime    time.Time
-	bytes        int64
+	R          io.ReadCloser
+	speedstart uint64
+	speedend   uint64
+	starttime  time.Time
+	bytes      int64
 }
 
 func (c *DelayReadCloser) Read(b []byte) (n int, err error) {
@@ -45,9 +45,9 @@ func (c DelayReadCloser) Close() error {
 }
 
 type Conn struct {
-	SpeedStart   string
-	SpeedEnd     string
-	Latency      int64
+	SpeedStart string
+	SpeedEnd   string
+	Latency    int64
 }
 
 type ConnMap map[string]Conn
@@ -56,14 +56,14 @@ var Connections = ConnMap{
 	"gsm":  Conn{"9.6Kb", "", 650},
 	"gprs": Conn{"35Kb", "171Kb", 650},
 	"edge": Conn{"120Kb", "384Kb", 300},
-	"umts": Conn{"384Kb", "2Mb",200},
+	"umts": Conn{"384Kb", "2Mb", 200},
 	"hspa": Conn{"600Kb", "10Mb", 100},
-	"lte":  Conn{"3Mb", "10Mb",50},
+	"lte":  Conn{"3Mb", "10Mb", 50},
 }
 
 func randrange(min, max uint64) int64 {
 	rand.Seed(time.Now().Unix())
-	return rand.Int63n(int64(max - min)) + int64(min)
+	return rand.Int63n(int64(max-min)) + int64(min)
 }
 
 func main() {
