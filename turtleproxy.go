@@ -15,9 +15,9 @@ import (
 
 type DelayReadCloser struct {
 	R          io.ReadCloser
-	speedstart uint64
-	speedend   uint64
-	starttime  time.Time
+	speedStart uint64
+	speedEnd   uint64
+	startTime  time.Time
 	bytes      int64
 }
 
@@ -27,13 +27,13 @@ func (c *DelayReadCloser) Read(b []byte) (n int, err error) {
 	return
 }
 func (c DelayReadCloser) Close() error {
-	endtime := time.Now()
-	timepassed := endtime.Sub(c.starttime)
+	endTime := time.Now()
+	timepassed := endTime.Sub(c.startTime)
 	var speed int64
-	if c.speedend == 0 {
-		speed = int64(c.speedstart)
+	if c.speedEnd == 0 {
+		speed = int64(c.speedStart)
 	} else {
-		speed = randrange(c.speedstart, c.speedend)
+		speed = randRange(c.speedStart, c.speedEnd)
 	}
 	delay := time.Duration(float64(c.bytes)*8/float64(speed)*1000) * time.Millisecond
 	log.Println("bytes: ", c.bytes)
@@ -61,15 +61,15 @@ var Connections = ConnMap{
 	"lte":  Conn{"3Mb", "10Mb", 50},
 }
 
-func randrange(min, max uint64) int64 {
+func randRange(min, max uint64) int64 {
 	rand.Seed(time.Now().Unix())
 	return rand.Int63n(int64(max-min)) + int64(min)
 }
 
 func main() {
-	verbose := flag.Bool("v", false, "Print out all messages")
-	speedhuman := flag.String("s", "808Kb", "Speed of the connection")
-	latency := flag.Int64("l", 200, "Latency of connection in ms")
+	verboseArg := flag.Bool("v", false, "Print out all messages")
+	speedHumanArg := flag.String("s", "808Kb", "Speed of the connection")
+	latencyArg := flag.Int64("l", 200, "Latency of connection in ms")
 	conntext := `Type of connection
 	 Available:
 	  "gsm"
@@ -78,56 +78,56 @@ func main() {
 	  "umts"
 	  "hspa"
 	  "lte"`
-	connection := flag.String("c", "", conntext)
-	addr := flag.String("addr", ":8080", "proxy listen address")
+	connectionArg := flag.String("c", "", conntext)
+	addrArg := flag.String("addr", ":8080", "proxy listen address")
 	flag.Parse()
-	if *verbose == false {
+	if *verboseArg == false {
 		log.SetOutput(ioutil.Discard)
 	}
-	if *connection != "" {
-		conn, err1 := Connections[strings.ToLower(*connection)]
+	if *connectionArg != "" {
+		connType, err1 := Connections[strings.ToLower(*connectionArg)]
 		if err1 == false {
-			log.Fatal("Type of connection not found: ", *connection)
+			log.Fatal("Type of connection not found: ", *connectionArg)
 		}
-		if conn.SpeedEnd != "" {
-			speedtemp := ""
-			speedtemp += conn.SpeedStart
-			speedtemp += "-"
-			speedtemp += conn.SpeedEnd
-			speedhuman = &speedtemp
+		if connType.SpeedEnd != "" {
+			speedTemp := ""
+			speedTemp += connType.SpeedStart
+			speedTemp += "-"
+			speedTemp += connType.SpeedEnd
+			speedHumanArg = &speedTemp
 		} else {
-			speedhuman = &conn.SpeedStart
+			speedHumanArg = &connType.SpeedStart
 		}
-		latency = &conn.Latency
+		latencyArg = &connType.Latency
 	}
-	log.Println("speed", *speedhuman)
-	log.Println("latency", *latency)
+	log.Println("speed", *speedHumanArg)
+	log.Println("latency", *latencyArg)
 	proxy := goproxy.NewProxyHttpServer()
-	proxy.Verbose = *verbose
-	speedhumanvalues := strings.Split(*speedhuman, "-")
-	var speed1 uint64 = 0
-	var speed2 uint64 = 0
+	proxy.Verbose = *verboseArg
+	speedHumanValues := strings.Split(*speedHumanArg, "-")
+	var speedStart uint64 = 0
+	var speedEnd uint64 = 0
 	var err2, err3, err4 error
-	if len(speedhumanvalues) > 1 {
-		speed1, err2 = humanize.ParseBytes(speedhumanvalues[0])
+	if len(speedHumanValues) > 1 {
+		speedStart, err2 = humanize.ParseBytes(speedHumanValues[0])
 		if err2 != nil {
 			log.Fatal(err2)
 		}
-		speed2, err3 = humanize.ParseBytes(speedhumanvalues[1])
+		speedEnd, err3 = humanize.ParseBytes(speedHumanValues[1])
 		if err3 != nil {
 			log.Fatal(err3)
 		}
 	} else {
-		speed1, err4 = humanize.ParseBytes(*speedhuman)
+		speedStart, err4 = humanize.ParseBytes(*speedHumanArg)
 		if err4 != nil {
 			log.Fatal(err4)
 		}
 	}
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		time.Sleep(time.Duration(*latency) * time.Millisecond)
-		starttime := time.Now()
-		resp.Body = &DelayReadCloser{resp.Body, speed1, speed2, starttime, 0}
+		time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
+		startTime := time.Now()
+		resp.Body = &DelayReadCloser{resp.Body, speedStart, speedEnd, startTime, 0}
 		return resp
 	})
-	log.Fatal(http.ListenAndServe(*addr, proxy))
+	log.Fatal(http.ListenAndServe(*addrArg, proxy))
 }
