@@ -1,16 +1,11 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"flag"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
-	"os/user"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -89,77 +84,6 @@ func randRange(min, max uint64) uint64 {
 	return uint64(rand.Int63n(int64(diff))) + min
 }
 
-func getCA(caRoot string) (*tls.Certificate, error) {
-	var (
-		err        error
-		caCert     []byte
-		caCertKey  []byte
-		parsedCert tls.Certificate
-	)
-
-	if caRoot == "" {
-		caRoot = os.Getenv("CAROOT")
-	}
-
-	if caRoot == "" {
-		caRoot = "~/.local/share/mkcert"
-	}
-
-	if strings.HasPrefix(caRoot, "~/") {
-		usr, err := user.Current()
-		if err != nil {
-			return nil, err
-		}
-
-		caRoot = filepath.Join(usr.HomeDir, caRoot[2:])
-	}
-
-	_, err = os.Stat(caRoot)
-
-	if err != nil {
-		return nil, err
-	}
-
-	rootCAPath := filepath.Join(caRoot, "rootCA.pem")
-	rootCAKeyPath := filepath.Join(caRoot, "rootCA-key.pem")
-
-	_, err = os.Stat(rootCAPath)
-
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = os.Stat(rootCAKeyPath)
-
-	if err != nil {
-		return nil, err
-	}
-
-	caCert, err = os.ReadFile(rootCAPath)
-
-	if err != nil {
-		return nil, err
-	}
-
-	caCertKey, err = os.ReadFile(rootCAKeyPath)
-
-	if err != nil {
-		return nil, err
-	}
-
-	parsedCert, err = tls.X509KeyPair(caCert, caCertKey)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if parsedCert.Leaf, err = x509.ParseCertificate(parsedCert.Certificate[0]); err != nil {
-		return nil, err
-	}
-
-	return &parsedCert, nil
-}
-
 func main() {
 	verboseArg := flag.Bool("v", false, "Print out all messages")
 	useCert := flag.Bool("usecert", true, "Use cert for for https")
@@ -206,7 +130,7 @@ func main() {
 	proxy := goproxy.NewProxyHttpServer()
 
 	if *useCert {
-		cert, err := getCA(*caRoot)
+		cert, err := GetCert(*caRoot)
 
 		if err == nil {
 			log.Println("Using cert for https")
