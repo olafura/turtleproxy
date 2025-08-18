@@ -4,8 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
-	"github.com/dustin/go-humanize"
-	"github.com/elazarl/goproxy"
 	"io"
 	"log"
 	"math/rand"
@@ -15,6 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/dustin/go-humanize"
+	"github.com/elazarl/goproxy"
 )
 
 type DelayReadCloser struct {
@@ -26,6 +27,9 @@ type DelayReadCloser struct {
 }
 
 func (c *DelayReadCloser) Read(b []byte) (n int, err error) {
+	delay := delay(int64(len(b)), c.speedStart, c.speedEnd)
+	time.Sleep(delay)
+
 	n, err = c.R.Read(b)
 	c.bytes += int64(n)
 	return
@@ -34,24 +38,33 @@ func (c *DelayReadCloser) Read(b []byte) (n int, err error) {
 func (c DelayReadCloser) Close() error {
 	endTime := time.Now()
 	timepassed := endTime.Sub(c.startTime)
-	var speed int64
 
-	if c.speedEnd == 0 {
-		speed = int64(c.speedStart)
-	} else {
-		speed = randRange(c.speedStart, c.speedEnd)
+	timepassedSec := timepassed.Seconds()
+	if timepassedSec > 0 {
+		speed := float64(c.bytes) / float64(timepassedSec)
+		log.Printf("effective speed: %s/s \n", humanize.Bytes(uint64(speed)))
 	}
-
-	delay := time.Duration(float64(c.bytes)*8/float64(speed)*1000) * time.Millisecond
-
-	log.Println("bytes: ", c.bytes)
-	log.Println("speed: ", speed)
-	log.Println("delay: ", delay)
+	log.Println("total bytes: ", humanize.Bytes(uint64(c.bytes)))
 	log.Println("timepassed: ", timepassed)
 
-	time.Sleep(delay - timepassed)
-
 	return c.R.Close()
+}
+
+func delay(bytes int64, speedStart uint64, speedEnd uint64) time.Duration {
+	var speed uint64
+	if speedEnd == 0 {
+		speed = speedStart
+	} else {
+		speed = randRange(speedStart, speedEnd)
+	}
+
+	delay := time.Duration(float64(bytes)*8/float64(speed)*1000) * time.Millisecond
+
+	log.Println("bytes: ", humanize.Bytes(uint64(bytes)))
+	log.Printf("speed: %s/s \n", humanize.Bytes(speed))
+	log.Println("delay: ", delay)
+
+	return delay
 }
 
 type Conn struct {
@@ -71,8 +84,9 @@ var Connections = ConnMap{
 	"lte":  Conn{"3Mb", "10Mb", 50},
 }
 
-func randRange(min, max uint64) int64 {
-	return rand.Int63n(int64(max-min)) + int64(min)
+func randRange(min, max uint64) uint64 {
+	diff := max - min
+	return uint64(rand.Int63n(int64(diff))) + min
 }
 
 func getCA(caRoot string) (*tls.Certificate, error) {
@@ -186,8 +200,8 @@ func main() {
 		latencyArg = &connType.Latency
 	}
 
-	log.Println("speed", *speedHumanArg)
-	log.Println("latency", *latencyArg)
+	log.Printf("speed: %s/s\n", *speedHumanArg)
+	log.Println("latency: ", *latencyArg)
 
 	proxy := goproxy.NewProxyHttpServer()
 
