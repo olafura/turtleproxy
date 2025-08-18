@@ -209,18 +209,19 @@ func main() {
 	}
 
 	if *jsonLog {
-		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-		slog.SetDefault(logger)
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	}
+
+	logger := slog.Default()
 
 	if *connectionArg != "" {
 		connTypeKey := strings.ToLower(strings.TrimSpace(*connectionArg))
 		if connTypeKey == "" {
-			log.Fatal("Connection type cannot be empty")
+			logger.Error("Connection type cannot be empty")
 		}
 		connType, exists := Connections[connTypeKey]
 		if !exists {
-			log.Fatal("Type of connection not found: ", *connectionArg)
+			logger.Error(fmt.Sprintf("Type of connection not found: %s", *connectionArg))
 		}
 		if connType.SpeedEnd != "" {
 			speedTemp := ""
@@ -234,8 +235,8 @@ func main() {
 		latencyArg = &connType.Latency
 	}
 
-	log.Printf("speed: %s/s\n", *speedHumanArg)
-	log.Println("latency: ", *latencyArg)
+	logger.Info(fmt.Sprintf("speed: %s/s", *speedHumanArg))
+	logger.Info(fmt.Sprintf("latency: %v", *latencyArg))
 
 	proxy := goproxy.NewProxyHttpServer()
 
@@ -245,7 +246,7 @@ func main() {
 		cert, err := GetCert(*caRoot)
 
 		if err == nil {
-			log.Println("Using cert for https")
+			logger.Info("Using cert for https")
 			proxy.CertStore = NewCertStorage()
 			customCaMitm := &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(cert)}
 			var customAlwaysMitm goproxy.FuncHttpsHandler = func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
@@ -253,7 +254,7 @@ func main() {
 			}
 			proxy.OnRequest().HandleConnect(customAlwaysMitm)
 		} else {
-			log.Println("Not using cert for https, error:", err)
+			logger.Error("Not using cert for https", "error", err)
 		}
 	}
 
@@ -268,16 +269,16 @@ func main() {
 	if len(speedHumanValues) > 1 {
 		speedStart, err2 = humanize.ParseBytes(speedHumanValues[0])
 		if err2 != nil {
-			log.Fatal(err2)
+			logger.Error(fmt.Sprintf("%v", err2))
 		}
 		speedEnd, err3 = humanize.ParseBytes(speedHumanValues[1])
 		if err3 != nil {
-			log.Fatal(err3)
+			logger.Error(fmt.Sprintf("%v", err3))
 		}
 	} else {
 		speedStart, err4 = humanize.ParseBytes(*speedHumanArg)
 		if err4 != nil {
-			log.Fatal(err4)
+			logger.Error(fmt.Sprintf("%v", err4))
 		}
 	}
 
