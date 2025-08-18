@@ -151,23 +151,6 @@ func randRange(min, max uint64) uint64 {
 	return uint64(mathrand.Int63n(int64(diff))) + min
 }
 
-func initRand() {
-	var seed int64
-
-	// Try to get cryptographically secure random seed
-	seedBytes := make([]byte, 8)
-	if _, err := rand.Read(seedBytes); err == nil {
-		for i, b := range seedBytes {
-			seed |= int64(b) << (8 * i)
-		}
-	} else {
-		// Fallback to time-based seed if crypto/rand fails
-		seed = time.Now().UnixNano()
-	}
-
-	mathrand.Seed(seed)
-}
-
 func sanitizeURL(u *url.URL) string {
 	if u == nil {
 		return "[nil URL]"
@@ -183,8 +166,6 @@ func sanitizeURL(u *url.URL) string {
 }
 
 func main() {
-	initRand()
-
 	verboseArg := flag.Bool("v", false, "Print out all messages")
 	useCert := flag.Bool("usecert", true, "Use cert for for https")
 	caRoot := flag.String("caroot", "", "Path to the CA root directory, default is ~/.local/share/mkcert or CAROOT")
