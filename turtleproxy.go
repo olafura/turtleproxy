@@ -165,13 +165,13 @@ func main() {
 
 	flag.Parse()
 
-	if *verboseArg == false {
+	if !*verboseArg {
 		log.SetOutput(io.Discard)
 	}
 
 	if *connectionArg != "" {
 		connType, err1 := Connections[strings.ToLower(*connectionArg)]
-		if err1 == false {
+		if !err1 {
 			log.Fatal("Type of connection not found: ", *connectionArg)
 		}
 		if connType.SpeedEnd != "" {
