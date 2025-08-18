@@ -43,7 +43,10 @@ jobs:
     
     - name: Download dependencies
       run: go mod download
-    
+
+    - name: WriteGoList
+      run: go list -json -m all > go.list
+
     - name: Nancy vulnerability scan
       uses: sonatype-nexus-community/nancy-github-action@main
 
