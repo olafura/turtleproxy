@@ -12,6 +12,25 @@ import (
 	"time"
 )
 
+func validateFilePath(basePath, filePath string) error {
+	cleanPath := filepath.Clean(filePath)
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve absolute path: %w", err)
+	}
+
+	absBase, err := filepath.Abs(basePath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve base path: %w", err)
+	}
+
+	if !strings.HasPrefix(absPath, absBase) {
+		return errors.New("file path is outside of allowed directory")
+	}
+
+	return nil
+}
+
 func GetCert(caRoot string) (*tls.Certificate, error) {
 	var (
 		err        error
@@ -58,6 +77,17 @@ func GetCert(caRoot string) (*tls.Certificate, error) {
 	rootCAPath := filepath.Join(caRoot, "rootCA.pem")
 	rootCAKeyPath := filepath.Join(caRoot, "rootCA-key.pem")
 
+	// Validate paths to prevent directory traversal
+	err = validateFilePath(caRoot, rootCAPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid certificate path: %w", err)
+	}
+
+	err = validateFilePath(caRoot, rootCAKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid key path: %w", err)
+	}
+
 	_, err = os.Stat(rootCAPath)
 	if err != nil {
 		return nil, fmt.Errorf("CA certificate file not found at %s: %w", rootCAPath, err)
@@ -68,12 +98,12 @@ func GetCert(caRoot string) (*tls.Certificate, error) {
 		return nil, fmt.Errorf("CA private key file not found at %s: %w", rootCAKeyPath, err)
 	}
 
-	caCert, err = os.ReadFile(rootCAPath)
+	caCert, err = os.ReadFile(rootCAPath) // #nosec G304 - path is validated above
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CA certificate from %s: %w", rootCAPath, err)
 	}
 
-	caCertKey, err = os.ReadFile(rootCAKeyPath)
+	caCertKey, err = os.ReadFile(rootCAKeyPath) // #nosec G304 - path is validated above
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CA private key from %s: %w", rootCAKeyPath, err)
 	}

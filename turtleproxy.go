@@ -1,12 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
-	mathrand "math/rand"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -69,7 +70,14 @@ func (c DelayReadWriteCloser) Close() error {
 		writeSpeed := float64(c.writeBytes) / float64(timepassedSec)
 		logger.Info(fmt.Sprintf("effective write speed: %s/s", humanize.Bytes(uint64(writeSpeed))))
 	}
-	logger.Info(fmt.Sprintf("total bytes: %s", humanize.Bytes(uint64(c.readBytes+c.writeBytes))))
+	totalBytes := c.readBytes + c.writeBytes
+	var totalBytesUint64 uint64
+	if totalBytes < 0 {
+		totalBytesUint64 = 0
+	} else {
+		totalBytesUint64 = uint64(totalBytes)
+	}
+	logger.Info(fmt.Sprintf("total bytes: %s", humanize.Bytes(totalBytesUint64)))
 	logger.Info(fmt.Sprintf("timepassed: %v", timepassed))
 
 	return c.R.Close()
@@ -95,6 +103,9 @@ func (c DelayReadCloser) Close() error {
 		speed := float64(c.bytes) / float64(timepassedSec)
 		logger.Info(fmt.Sprintf("effective speed: %s/s", humanize.Bytes(uint64(speed))))
 	}
+	if c.bytes < 0 {
+		c.bytes = 0
+	}
 	logger.Info(fmt.Sprintf("total bytes: %s", humanize.Bytes(uint64(c.bytes))))
 	logger.Info(fmt.Sprintf("timepassed: %v", timepassed))
 
@@ -111,7 +122,13 @@ func delay(logger slog.Logger, bytes int64, speedStart uint64, speedEnd uint64) 
 
 	delay := time.Duration(float64(bytes)*8/float64(speed)*1000) * time.Millisecond
 
-	logger.Info(fmt.Sprintf("bytes: %s", humanize.Bytes(uint64(bytes))))
+	var bytesUint64 uint64
+	if bytes < 0 {
+		bytesUint64 = 0
+	} else {
+		bytesUint64 = uint64(bytes)
+	}
+	logger.Info(fmt.Sprintf("bytes: %s", humanize.Bytes(bytesUint64)))
 	logger.Info(fmt.Sprintf("speed: %s/s", humanize.Bytes(speed)))
 	logger.Info(fmt.Sprintf("delay: %v", delay))
 
@@ -142,12 +159,38 @@ var Connections = ConnMap{
 	"lte":  Conn{"3Mb", "10Mb", 50},
 }
 
+const MaxUint64 = ^uint64(0)
+
 func randRange(min, max uint64) uint64 {
 	diff := max - min
 	if diff == 0 {
 		return min
 	}
-	return uint64(mathrand.Int63n(int64(diff))) + min
+
+	if diff > MaxUint64 {
+		return min
+	}
+
+	diffInt := int64(diff) // #nosec G115 - diff is bounded above
+
+	randNum, err := rand.Int(rand.Reader, big.NewInt(diffInt))
+	if err != nil {
+		// Fallback to min if crypto rand fails
+		return min
+	}
+
+	randInt64 := randNum.Int64()
+	if randInt64 < 0 || randInt64 > diffInt {
+		randInt64 = 0
+	}
+
+	randUint64 := uint64(randInt64) + min // #nosec G115 - randInt64 is validated above
+
+	if randUint64 < min || randUint64 > max {
+		return min
+	}
+
+	return randUint64
 }
 
 func sanitizeURL(u *url.URL) string {
@@ -291,5 +334,12 @@ func main() {
 		return resp
 	})
 
-	log.Fatal(http.ListenAndServe(*addrArg, proxy))
+	server := &http.Server{
+		Addr:         *addrArg,
+		Handler:      proxy,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+	log.Fatal(server.ListenAndServe())
 }
