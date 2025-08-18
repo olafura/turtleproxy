@@ -1,13 +1,15 @@
 package main
 
 import (
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
-	"math/rand"
+	mathrand "math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -143,10 +145,46 @@ var Connections = ConnMap{
 
 func randRange(min, max uint64) uint64 {
 	diff := max - min
-	return uint64(rand.Int63n(int64(diff))) + min
+	if diff == 0 {
+		return min
+	}
+	return uint64(mathrand.Int63n(int64(diff))) + min
+}
+
+func initRand() {
+	var seed int64
+
+	// Try to get cryptographically secure random seed
+	seedBytes := make([]byte, 8)
+	if _, err := rand.Read(seedBytes); err == nil {
+		for i, b := range seedBytes {
+			seed |= int64(b) << (8 * i)
+		}
+	} else {
+		// Fallback to time-based seed if crypto/rand fails
+		seed = time.Now().UnixNano()
+	}
+
+	mathrand.Seed(seed)
+}
+
+func sanitizeURL(u *url.URL) string {
+	if u == nil {
+		return "[nil URL]"
+	}
+
+	sanitized := &url.URL{
+		Scheme: u.Scheme,
+		Host:   u.Host,
+		Path:   u.Path,
+	}
+
+	return sanitized.String()
 }
 
 func main() {
+	initRand()
+
 	verboseArg := flag.Bool("v", false, "Print out all messages")
 	useCert := flag.Bool("usecert", true, "Use cert for for https")
 	caRoot := flag.String("caroot", "", "Path to the CA root directory, default is ~/.local/share/mkcert or CAROOT")
@@ -176,8 +214,12 @@ func main() {
 	}
 
 	if *connectionArg != "" {
-		connType, err1 := Connections[strings.ToLower(*connectionArg)]
-		if !err1 {
+		connTypeKey := strings.ToLower(strings.TrimSpace(*connectionArg))
+		if connTypeKey == "" {
+			log.Fatal("Connection type cannot be empty")
+		}
+		connType, exists := Connections[connTypeKey]
+		if !exists {
 			log.Fatal("Type of connection not found: ", *connectionArg)
 		}
 		if connType.SpeedEnd != "" {
@@ -245,8 +287,7 @@ func main() {
 		// We don't want to mess with Websocket upgrade and the like
 		if resp != nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			if resp.Request != nil && resp.Request.URL != nil {
-				logger.Info(fmt.Sprintf("Response received for: %s", resp.Request.URL))
-
+				logger.Info(fmt.Sprintf("Response received for: %s", sanitizeURL(resp.Request.URL)))
 			}
 			time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
 			resp.Body = &DelayReadCloser{resp.Body, speedStart, speedEnd, startTime, 0}
@@ -254,11 +295,16 @@ func main() {
 			isWebsocket := isWebSocketHandshake(resp.Header)
 			if isWebsocket {
 				if resp.Request != nil && resp.Request.URL != nil {
-					logger.Info(fmt.Sprintf("Response received for: %s", resp.Request.URL))
-
+					logger.Info(fmt.Sprintf("Response received for: %s", sanitizeURL(resp.Request.URL)))
 				}
 				time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
-				resp.Body = &DelayReadWriteCloser{resp.Body.(io.ReadWriteCloser), speedStart, speedEnd, startTime, 0, 0}
+
+				if rwc, ok := resp.Body.(io.ReadWriteCloser); ok {
+					resp.Body = &DelayReadWriteCloser{rwc, speedStart, speedEnd, startTime, 0, 0}
+				} else {
+					logger.Info("WebSocket upgrade response body does not implement ReadWriteCloser, using standard DelayReadCloser")
+					resp.Body = &DelayReadCloser{resp.Body, speedStart, speedEnd, startTime, 0}
+				}
 			}
 		}
 		return resp
