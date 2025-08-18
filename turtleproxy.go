@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"github.com/dustin/go-humanize"
 	"github.com/elazarl/goproxy"
@@ -8,6 +10,9 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
+	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -70,8 +75,81 @@ func randRange(min, max uint64) int64 {
 	return rand.Int63n(int64(max-min)) + int64(min)
 }
 
+func getCA(caRoot string) (*tls.Certificate, error) {
+	var (
+		err        error
+		caCert     []byte
+		caCertKey  []byte
+		parsedCert tls.Certificate
+	)
+
+	if caRoot == "" {
+		caRoot = os.Getenv("CAROOT")
+	}
+
+	if caRoot == "" {
+		caRoot = "~/.local/share/mkcert"
+	}
+
+	if strings.HasPrefix(caRoot, "~/") {
+		usr, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
+
+		caRoot = filepath.Join(usr.HomeDir, caRoot[2:])
+	}
+
+	_, err = os.Stat(caRoot)
+
+	if err != nil {
+		return nil, err
+	}
+
+	rootCAPath := filepath.Join(caRoot, "rootCA.pem")
+	rootCAKeyPath := filepath.Join(caRoot, "rootCA-key.pem")
+
+	_, err = os.Stat(rootCAPath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = os.Stat(rootCAKeyPath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	caCert, err = os.ReadFile(rootCAPath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	caCertKey, err = os.ReadFile(rootCAKeyPath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	parsedCert, err = tls.X509KeyPair(caCert, caCertKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if parsedCert.Leaf, err = x509.ParseCertificate(parsedCert.Certificate[0]); err != nil {
+		return nil, err
+	}
+
+	return &parsedCert, nil
+}
+
 func main() {
 	verboseArg := flag.Bool("v", false, "Print out all messages")
+	useCert := flag.Bool("usecert", true, "Use cert for for https")
+	caRoot := flag.String("caroot", "", "Path to the CA root directory, default is ~/.local/share/mkcert or CAROOT")
 	speedHumanArg := flag.String("s", "808Kb", "Speed of the connection")
 	latencyArg := flag.Int64("l", 200, "Latency of connection in ms")
 	conntext := `Type of connection
@@ -84,6 +162,7 @@ func main() {
 	  "lte"`
 	connectionArg := flag.String("c", "", conntext)
 	addrArg := flag.String("addr", ":8080", "proxy listen address")
+
 	flag.Parse()
 
 	if *verboseArg == false {
@@ -111,7 +190,24 @@ func main() {
 	log.Println("latency", *latencyArg)
 
 	proxy := goproxy.NewProxyHttpServer()
+
+	if *useCert {
+		cert, err := getCA(*caRoot)
+
+		if err == nil {
+			log.Println("Using cert for https")
+			customCaMitm := &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(cert)}
+			var customAlwaysMitm goproxy.FuncHttpsHandler = func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
+				return customCaMitm, host
+			}
+			proxy.OnRequest().HandleConnect(customAlwaysMitm)
+		} else {
+			log.Println("Not using cert for https, error:", err)
+		}
+	}
+
 	proxy.Verbose = *verboseArg
+
 	speedHumanValues := strings.Split(*speedHumanArg, "-")
 
 	var speedStart uint64 = 0
@@ -135,6 +231,7 @@ func main() {
 	}
 
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		log.Println("Response received for:", resp.Request.URL)
 		time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
 		startTime := time.Now()
 		resp.Body = &DelayReadCloser{resp.Body, speedStart, speedEnd, startTime, 0}

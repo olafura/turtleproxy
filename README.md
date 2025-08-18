@@ -1,12 +1,10 @@
-TurtleProxy simulates slow connections
-======================================
+# TurtleProxy simulates slow connections
 
 Currently TurtleProxy supports mobile connections as listed in --help
 
 You can also assign your own speed and latency.
 
-Run
----
+## Run
 
 You can access the binaries prebuilt here:
 
@@ -22,8 +20,13 @@ Instead of installing it you can also do:
 
 `go run turtleproxy.go`
 
-Read [How to Write Go Code](http://golang.org/doc/code.html)
-to get the layout of your workspace right
+
+## Https support
+
+#### MkCert
+Do you want a managed, easy to use solution that automatically generates
+a root CA certificate for local usage, and automatically adds it to the trusted system
+certificates? Consider [MkCert](https://github.com/FiloSottile/mkcert).
 
 Future
 ------
