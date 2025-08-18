@@ -13,12 +13,59 @@ import (
 	"github.com/elazarl/goproxy"
 )
 
+type DelayReadWriteCloser struct {
+	R          io.ReadWriteCloser
+	speedStart uint64
+	speedEnd   uint64
+	startTime  time.Time
+	readBytes  int64
+	writeBytes int64
+}
+
 type DelayReadCloser struct {
 	R          io.ReadCloser
 	speedStart uint64
 	speedEnd   uint64
 	startTime  time.Time
 	bytes      int64
+}
+
+func (c *DelayReadWriteCloser) Read(b []byte) (n int, err error) {
+	log.Println("websocket read")
+	delay := delay(int64(len(b)), c.speedStart, c.speedEnd)
+	time.Sleep(delay)
+
+	n, err = c.R.Read(b)
+	c.readBytes += int64(n)
+	return
+}
+
+func (c *DelayReadWriteCloser) Write(b []byte) (n int, err error) {
+	log.Println("websocket write")
+	delay := delay(int64(len(b)), c.speedStart, c.speedEnd)
+	time.Sleep(delay)
+
+	n, err = c.R.Write(b)
+	c.writeBytes += int64(n)
+	return
+}
+
+func (c DelayReadWriteCloser) Close() error {
+	log.Println("websocket close")
+	endTime := time.Now()
+	timepassed := endTime.Sub(c.startTime)
+
+	timepassedSec := timepassed.Seconds()
+	if timepassedSec > 0 {
+		readSpeed := float64(c.readBytes) / float64(timepassedSec)
+		log.Printf("effective read speed: %s/s \n", humanize.Bytes(uint64(readSpeed)))
+		writeSpeed := float64(c.writeBytes) / float64(timepassedSec)
+		log.Printf("effective write speed: %s/s \n", humanize.Bytes(uint64(writeSpeed)))
+	}
+	log.Println("total bytes: ", humanize.Bytes(uint64(c.readBytes+c.writeBytes)))
+	log.Println("timepassed: ", timepassed)
+
+	return c.R.Close()
 }
 
 func (c *DelayReadCloser) Read(b []byte) (n int, err error) {
@@ -170,10 +217,27 @@ func main() {
 	}
 
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		log.Println("Response received for:", resp.Request.URL)
-		time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
-		startTime := time.Now()
-		resp.Body = &DelayReadCloser{resp.Body, speedStart, speedEnd, startTime, 0}
+		// We don't want to mess with Websocket upgrade and the like
+		if resp != nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			if resp.Request != nil && resp.Request.URL != nil {
+				log.Println("Response received for:", resp.Request.URL)
+
+			}
+			time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
+			startTime := time.Now()
+			resp.Body = &DelayReadCloser{resp.Body, speedStart, speedEnd, startTime, 0}
+		} else {
+			isWebsocket := isWebSocketHandshake(resp.Header)
+			if isWebsocket {
+				if resp.Request != nil && resp.Request.URL != nil {
+					log.Println("Response received for:", resp.Request.URL)
+
+				}
+				time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
+				startTime := time.Now()
+				resp.Body = &DelayReadWriteCloser{resp.Body.(io.ReadWriteCloser), speedStart, speedEnd, startTime, 0, 0}
+			}
+		}
 		return resp
 	})
 
