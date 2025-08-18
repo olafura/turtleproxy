@@ -210,6 +210,7 @@ func main() {
 
 		if err == nil {
 			log.Println("Using cert for https")
+			proxy.CertStore = NewCertStorage()
 			customCaMitm := &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(cert)}
 			var customAlwaysMitm goproxy.FuncHttpsHandler = func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
 				return customCaMitm, host
