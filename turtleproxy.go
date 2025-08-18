@@ -2,10 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -31,8 +34,9 @@ type DelayReadCloser struct {
 }
 
 func (c *DelayReadWriteCloser) Read(b []byte) (n int, err error) {
-	log.Println("websocket read")
-	delay := delay(int64(len(b)), c.speedStart, c.speedEnd)
+	logger := slog.Default().With("epoch", c.startTime.Unix())
+	logger.Info("websocket read")
+	delay := delay(*logger, int64(len(b)), c.speedStart, c.speedEnd)
 	time.Sleep(delay)
 
 	n, err = c.R.Read(b)
@@ -41,8 +45,9 @@ func (c *DelayReadWriteCloser) Read(b []byte) (n int, err error) {
 }
 
 func (c *DelayReadWriteCloser) Write(b []byte) (n int, err error) {
-	log.Println("websocket write")
-	delay := delay(int64(len(b)), c.speedStart, c.speedEnd)
+	logger := slog.Default().With("epoch", c.startTime.Unix())
+	logger.Info("websocket write")
+	delay := delay(*logger, int64(len(b)), c.speedStart, c.speedEnd)
 	time.Sleep(delay)
 
 	n, err = c.R.Write(b)
@@ -51,25 +56,27 @@ func (c *DelayReadWriteCloser) Write(b []byte) (n int, err error) {
 }
 
 func (c DelayReadWriteCloser) Close() error {
-	log.Println("websocket close")
+	logger := slog.Default().With("epoch", c.startTime.Unix())
+	logger.Info("websocket close")
 	endTime := time.Now()
 	timepassed := endTime.Sub(c.startTime)
 
 	timepassedSec := timepassed.Seconds()
 	if timepassedSec > 0 {
 		readSpeed := float64(c.readBytes) / float64(timepassedSec)
-		log.Printf("effective read speed: %s/s \n", humanize.Bytes(uint64(readSpeed)))
+		logger.Info(fmt.Sprintf("effective read speed: %s/s", humanize.Bytes(uint64(readSpeed))))
 		writeSpeed := float64(c.writeBytes) / float64(timepassedSec)
-		log.Printf("effective write speed: %s/s \n", humanize.Bytes(uint64(writeSpeed)))
+		logger.Info(fmt.Sprintf("effective write speed: %s/s", humanize.Bytes(uint64(writeSpeed))))
 	}
-	log.Println("total bytes: ", humanize.Bytes(uint64(c.readBytes+c.writeBytes)))
-	log.Println("timepassed: ", timepassed)
+	logger.Info(fmt.Sprintf("total bytes: %s", humanize.Bytes(uint64(c.readBytes+c.writeBytes))))
+	logger.Info(fmt.Sprintf("timepassed: %v", timepassed))
 
 	return c.R.Close()
 }
 
 func (c *DelayReadCloser) Read(b []byte) (n int, err error) {
-	delay := delay(int64(len(b)), c.speedStart, c.speedEnd)
+	logger := slog.Default().With("epoch", c.startTime.Unix())
+	delay := delay(*logger, int64(len(b)), c.speedStart, c.speedEnd)
 	time.Sleep(delay)
 
 	n, err = c.R.Read(b)
@@ -78,21 +85,22 @@ func (c *DelayReadCloser) Read(b []byte) (n int, err error) {
 }
 
 func (c DelayReadCloser) Close() error {
+	logger := slog.Default().With("epoch", c.startTime.Unix())
 	endTime := time.Now()
 	timepassed := endTime.Sub(c.startTime)
 
 	timepassedSec := timepassed.Seconds()
 	if timepassedSec > 0 {
 		speed := float64(c.bytes) / float64(timepassedSec)
-		log.Printf("effective speed: %s/s \n", humanize.Bytes(uint64(speed)))
+		logger.Info(fmt.Sprintf("effective speed: %s/s", humanize.Bytes(uint64(speed))))
 	}
-	log.Println("total bytes: ", humanize.Bytes(uint64(c.bytes)))
-	log.Println("timepassed: ", timepassed)
+	logger.Info(fmt.Sprintf("total bytes: %s", humanize.Bytes(uint64(c.bytes))))
+	logger.Info(fmt.Sprintf("timepassed: %v", timepassed))
 
 	return c.R.Close()
 }
 
-func delay(bytes int64, speedStart uint64, speedEnd uint64) time.Duration {
+func delay(logger slog.Logger, bytes int64, speedStart uint64, speedEnd uint64) time.Duration {
 	var speed uint64
 	if speedEnd == 0 {
 		speed = speedStart
@@ -102,11 +110,18 @@ func delay(bytes int64, speedStart uint64, speedEnd uint64) time.Duration {
 
 	delay := time.Duration(float64(bytes)*8/float64(speed)*1000) * time.Millisecond
 
-	log.Println("bytes: ", humanize.Bytes(uint64(bytes)))
-	log.Printf("speed: %s/s \n", humanize.Bytes(speed))
-	log.Println("delay: ", delay)
+	logger.Info(fmt.Sprintf("bytes: %s", humanize.Bytes(uint64(bytes))))
+	logger.Info(fmt.Sprintf("speed: %s/s", humanize.Bytes(speed)))
+	logger.Info(fmt.Sprintf("delay: %v", delay))
 
 	return delay
+}
+
+type BetterLogger struct{}
+
+func (b BetterLogger) Printf(format string, v ...any) {
+	logger := slog.Default()
+	logger.Info(fmt.Sprintf(format, v...))
 }
 
 type Conn struct {
@@ -135,6 +150,7 @@ func main() {
 	verboseArg := flag.Bool("v", false, "Print out all messages")
 	useCert := flag.Bool("usecert", true, "Use cert for for https")
 	caRoot := flag.String("caroot", "", "Path to the CA root directory, default is ~/.local/share/mkcert or CAROOT")
+	jsonLog := flag.Bool("json", false, "Use json for logging")
 	speedHumanArg := flag.String("s", "808Kb", "Speed of the connection")
 	latencyArg := flag.Int64("l", 200, "Latency of connection in ms")
 	conntext := `Type of connection
@@ -152,6 +168,11 @@ func main() {
 
 	if !*verboseArg {
 		log.SetOutput(io.Discard)
+	}
+
+	if *jsonLog {
+		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+		slog.SetDefault(logger)
 	}
 
 	if *connectionArg != "" {
@@ -175,6 +196,8 @@ func main() {
 	log.Println("latency: ", *latencyArg)
 
 	proxy := goproxy.NewProxyHttpServer()
+
+	proxy.Logger = &BetterLogger{}
 
 	if *useCert {
 		cert, err := GetCert(*caRoot)
@@ -217,24 +240,24 @@ func main() {
 	}
 
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		startTime := time.Now()
+		logger := slog.Default().With("epoch", startTime.Unix())
 		// We don't want to mess with Websocket upgrade and the like
 		if resp != nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			if resp.Request != nil && resp.Request.URL != nil {
-				log.Println("Response received for:", resp.Request.URL)
+				logger.Info(fmt.Sprintf("Response received for: %s", resp.Request.URL))
 
 			}
 			time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
-			startTime := time.Now()
 			resp.Body = &DelayReadCloser{resp.Body, speedStart, speedEnd, startTime, 0}
 		} else {
 			isWebsocket := isWebSocketHandshake(resp.Header)
 			if isWebsocket {
 				if resp.Request != nil && resp.Request.URL != nil {
-					log.Println("Response received for:", resp.Request.URL)
+					logger.Info(fmt.Sprintf("Response received for: %s", resp.Request.URL))
 
 				}
 				time.Sleep(time.Duration(*latencyArg) * time.Millisecond)
-				startTime := time.Now()
 				resp.Body = &DelayReadWriteCloser{resp.Body.(io.ReadWriteCloser), speedStart, speedEnd, startTime, 0, 0}
 			}
 		}
