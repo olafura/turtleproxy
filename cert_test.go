@@ -205,8 +205,14 @@ func TestGetCertEmptyCARoot(t *testing.T) {
 
 	// Set CAROOT environment variable
 	originalCARoot := os.Getenv("CAROOT")
-	defer os.Setenv("CAROOT", originalCARoot)
-	os.Setenv("CAROOT", tempDir)
+	defer func() {
+		if err := os.Setenv("CAROOT", originalCARoot); err != nil {
+			t.Errorf("Failed to restore CAROOT: %v", err)
+		}
+	}()
+	if err := os.Setenv("CAROOT", tempDir); err != nil {
+		t.Fatalf("Failed to set CAROOT: %v", err)
+	}
 
 	// Test with empty caRoot parameter (should use CAROOT env var)
 	cert, err := GetCert("")

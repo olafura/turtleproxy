@@ -96,15 +96,24 @@ func TestCertStorageEviction(t *testing.T) {
 	}
 
 	// Fill the cache to capacity
-	cs.Fetch("host1.com", gen)
-	cs.Fetch("host2.com", gen)
+	_, err := cs.Fetch("host1.com", gen)
+	if err != nil {
+		t.Fatalf("Failed to fetch host1.com: %v", err)
+	}
+	_, err = cs.Fetch("host2.com", gen)
+	if err != nil {
+		t.Fatalf("Failed to fetch host2.com: %v", err)
+	}
 
 	if len(cs.certs) != 2 {
 		t.Errorf("Expected 2 certificates in cache, got %d", len(cs.certs))
 	}
 
 	// Adding a third should evict the oldest
-	cs.Fetch("host3.com", gen)
+	_, err = cs.Fetch("host3.com", gen)
+	if err != nil {
+		t.Fatalf("Failed to fetch host3.com: %v", err)
+	}
 
 	if len(cs.certs) != 2 {
 		t.Errorf("Expected 2 certificates in cache after eviction, got %d", len(cs.certs))
@@ -132,7 +141,10 @@ func TestCertStorageEvictExpired(t *testing.T) {
 	}
 
 	// Add a certificate
-	cs.Fetch("expired.com", gen)
+	_, err := cs.Fetch("expired.com", gen)
+	if err != nil {
+		t.Fatalf("Failed to fetch expired.com: %v", err)
+	}
 
 	if len(cs.certs) != 1 {
 		t.Errorf("Expected 1 certificate in cache, got %d", len(cs.certs))
@@ -142,7 +154,10 @@ func TestCertStorageEvictExpired(t *testing.T) {
 	time.Sleep(2 * time.Millisecond)
 
 	// Trigger eviction by adding another certificate
-	cs.Fetch("new.com", gen)
+	_, err = cs.Fetch("new.com", gen)
+	if err != nil {
+		t.Fatalf("Failed to fetch new.com: %v", err)
+	}
 
 	// The expired certificate should be cleaned up
 	if _, exists := cs.certs["expired.com"]; exists {
