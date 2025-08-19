@@ -1,4 +1,4 @@
-package main
+package cache
 
 // from https://github.com/elazarl/goproxy/blob/master/examples/certstorage/cache.go
 

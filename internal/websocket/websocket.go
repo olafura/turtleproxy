@@ -1,4 +1,4 @@
-package main
+package websocket
 
 // from https://github.com/elazarl/goproxy/blob/master/websocket.go
 
@@ -18,7 +18,7 @@ func headerContains(header http.Header, name string, value string) bool {
 	return false
 }
 
-func isWebSocketHandshake(header http.Header) bool {
+func IsWebSocketHandshake(header http.Header) bool {
 	return headerContains(header, "Connection", "Upgrade") &&
 		headerContains(header, "Upgrade", "websocket")
 }

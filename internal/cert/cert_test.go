@@ -1,4 +1,4 @@
-package main
+package cert
 
 import (
 	"crypto/rand"
@@ -59,7 +59,7 @@ func createTestCertificate(t *testing.T, notBefore, notAfter time.Time) ([]byte,
 }
 
 func createTestCAFiles(t *testing.T, caRoot string, notBefore, notAfter time.Time) {
-	err := os.MkdirAll(caRoot, 0755)
+	err := os.MkdirAll(caRoot, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create CA root directory: %v", err)
 	}
@@ -69,12 +69,12 @@ func createTestCAFiles(t *testing.T, caRoot string, notBefore, notAfter time.Tim
 	certPath := filepath.Join(caRoot, "rootCA.pem")
 	keyPath := filepath.Join(caRoot, "rootCA-key.pem")
 
-	err = os.WriteFile(certPath, certPEM, 0644)
+	err = os.WriteFile(certPath, certPEM, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write certificate file: %v", err)
 	}
 
-	err = os.WriteFile(keyPath, keyPEM, 0600)
+	err = os.WriteFile(keyPath, keyPEM, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write key file: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestGetCertMissingCertFile(t *testing.T) {
 
 	// Create only the key file, not the cert file
 	keyPath := filepath.Join(tempDir, "rootCA-key.pem")
-	err := os.WriteFile(keyPath, []byte("dummy key"), 0600)
+	err := os.WriteFile(keyPath, []byte("dummy key"), 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write key file: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestGetCertMissingKeyFile(t *testing.T) {
 
 	// Create only the cert file, not the key file
 	certPath := filepath.Join(tempDir, "rootCA.pem")
-	err := os.WriteFile(certPath, []byte("dummy cert"), 0644)
+	err := os.WriteFile(certPath, []byte("dummy cert"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write cert file: %v", err)
 	}
@@ -179,12 +179,12 @@ func TestGetCertInvalidCertificateFormat(t *testing.T) {
 	keyPath := filepath.Join(tempDir, "rootCA-key.pem")
 
 	// Write invalid certificate and key data
-	err := os.WriteFile(certPath, []byte("invalid cert data"), 0644)
+	err := os.WriteFile(certPath, []byte("invalid cert data"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write invalid cert file: %v", err)
 	}
 
-	err = os.WriteFile(keyPath, []byte("invalid key data"), 0600)
+	err = os.WriteFile(keyPath, []byte("invalid key data"), 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write invalid key file: %v", err)
 	}

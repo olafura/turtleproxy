@@ -1,4 +1,4 @@
-package main
+package websocket
 
 import (
 	"net/http"
@@ -133,9 +133,9 @@ func TestIsWebSocketHandshake(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isWebSocketHandshake(tt.header)
+			result := IsWebSocketHandshake(tt.header)
 			if result != tt.expected {
-				t.Errorf("isWebSocketHandshake() = %v, want %v", result, tt.expected)
+				t.Errorf("IsWebSocketHandshake() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
