@@ -142,23 +142,6 @@ func (b BetterLogger) Printf(format string, v ...any) {
 	logger.Info(fmt.Sprintf(format, v...))
 }
 
-type Conn struct {
-	SpeedStart string
-	SpeedEnd   string
-	Latency    int64
-}
-
-type ConnMap map[string]Conn
-
-var Connections = ConnMap{
-	"gsm":  Conn{"9.6Kb", "", 650},
-	"gprs": Conn{"35Kb", "171Kb", 650},
-	"edge": Conn{"120Kb", "384Kb", 300},
-	"umts": Conn{"384Kb", "2Mb", 200},
-	"hspa": Conn{"600Kb", "10Mb", 100},
-	"lte":  Conn{"3Mb", "10Mb", 50},
-}
-
 const MaxUint64 = ^uint64(0)
 
 func randRange(min, max uint64) uint64 {
