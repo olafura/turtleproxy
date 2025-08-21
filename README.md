@@ -10,7 +10,7 @@ The heavy lifting is done by the excellent [goproxy](https://github.com/elazarl/
 
 You can access the binaries prebuilt here:
 
-[releases/tag/0.1](https://github.com/olafura/turtleproxy/releases/tag/0.1)
+[releases/tag/v0.2](https://github.com/olafura/turtleproxy/releases/tag/v0.2)
 
 If you want to compile it yourself then it's easy. It's written in Go so you need to execute those commands:
 
