@@ -31,7 +31,8 @@ var Connections = ConnMap{
 }
 
 func main() {
-	verboseArg := flag.Bool("v", false, "Print out all messages")
+	semiVerboseArg := flag.Bool("v", false, "Print out some logs")
+	verboseArg := flag.Bool("vv", false, "Print out all logs")
 	useCertArg := flag.Bool("usecert", true, "Use cert for for https")
 	caRootArg := flag.String("caroot", "", "Path to the CA root directory, default is ~/.local/share/mkcert or CAROOT")
 	jsonLogArg := flag.Bool("json", false, "Use json for logging")
@@ -53,7 +54,7 @@ func main() {
 
 	flag.Parse()
 
-	if !*verboseArg {
+	if !*verboseArg && !*semiVerboseArg {
 		log.SetOutput(io.Discard)
 	}
 
