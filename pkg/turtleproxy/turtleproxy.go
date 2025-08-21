@@ -120,7 +120,7 @@ func delay(logger slog.Logger, bytes int64, speedStart uint64, speedEnd uint64) 
 		speed = randRange(speedStart, speedEnd)
 	}
 
-	delay := time.Duration(float64(bytes)*8/float64(speed)*1000) * time.Millisecond
+	delay := time.Duration((float64(bytes)/float64(speed))*1000) * time.Millisecond
 
 	var bytesUint64 uint64
 	if bytes < 0 {
