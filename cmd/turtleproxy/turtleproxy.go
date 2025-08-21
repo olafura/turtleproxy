@@ -86,7 +86,7 @@ func main() {
 
 	speedHumanValues := strings.Split(*speedHumanArg, "-")
 
-	var speedStart uint64 = 0
+	var speedStart uint64
 	var speedEnd uint64 = 0
 	var err2, err3, err4 error
 
