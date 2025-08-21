@@ -4,7 +4,7 @@ Currently TurtleProxy supports mobile connections as listed in --help
 
 You can also assign your own speed and latency.
 
-The heavy lifting is done by the excelent [goproxy](https://github.com/elazarl/goproxy)
+The heavy lifting is done by the excellent [goproxy](https://github.com/elazarl/goproxy)
 
 ## Run
 
