@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/icon">
+        <file>images/turtle-proxy.svg</file>
+        <file>images/turtle-proxy.png</file>
+        <file>images/turtle-proxy-white.png</file>
+    </qresource>
+</RCC>
