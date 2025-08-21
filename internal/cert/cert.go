@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -44,7 +45,16 @@ func GetCert(caRoot string) (*tls.Certificate, error) {
 	}
 
 	if caRoot == "" {
-		caRoot = "~/.local/share/mkcert"
+		switch {
+		case os.Getenv("XDG_DATA_HOME") != "":
+			caRoot = filepath.Join(os.Getenv("XDG_DATA_HOME"), "mkcert")
+		case runtime.GOOS == "darwin":
+			caRoot = "~/Library/Application Support/mkcert"
+		case runtime.GOOS == "windows":
+			caRoot = filepath.Join(os.Getenv("LocalAppData"), "mkcert")
+		default:
+			caRoot = "~/.local/share/mkcert"
+		}
 	}
 
 	if strings.HasPrefix(caRoot, "~/") {
