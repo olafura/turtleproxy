@@ -15,6 +15,7 @@ import (
 	"github.com/elazarl/goproxy"
 	"github.com/olafura/turtleproxy/internal/cache"
 	"github.com/olafura/turtleproxy/internal/cert"
+	"github.com/olafura/turtleproxy/internal/filter"
 	"github.com/olafura/turtleproxy/internal/websocket"
 )
 
@@ -190,7 +191,7 @@ func sanitizeURL(u *url.URL) string {
 	return sanitized.String()
 }
 
-func Proxy(addr string, useCert bool, caRoot string, verbose bool, latency int64, speedStart uint64, speedEnd uint64) {
+func Proxy(addr string, useCert bool, caRoot string, verbose bool, latency int64, speedStart uint64, speedEnd uint64, filterHost string, regexHost string, regexURL string) {
 	logger := slog.Default()
 
 	proxy := goproxy.NewProxyHttpServer()
@@ -215,7 +216,24 @@ func Proxy(addr string, useCert bool, caRoot string, verbose bool, latency int64
 
 	proxy.Verbose = verbose
 
+	conds := filter.GetConds(filterHost, regexHost, regexURL)
+
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		if resp.Request != nil && resp.Request.URL != nil {
+			logger.Info(fmt.Sprintf("Response host: %s", resp.Request.Host))
+		}
+
+		shouldSlowDown := len(conds) == 0
+
+		for _, cond := range conds {
+			if cond.HandleResp(resp, ctx) {
+				shouldSlowDown = true
+			}
+		}
+		if !shouldSlowDown {
+			return resp
+		}
+
 		startTime := time.Now()
 		logger := slog.Default().With("epoch", startTime.Unix())
 		// We don't want to mess with Websocket upgrade and the like

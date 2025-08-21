@@ -47,6 +47,9 @@ func main() {
 	  "lte"`
 	connectionArg := flag.String("c", "", conntext)
 	addrArg := flag.String("addr", ":8080", "proxy listen address")
+	filterHostArg := flag.String("host", "", "Only filter host full path, with or without port, ex: 'www.example.com', 'www.example.com:443'")
+	regexHostArg := flag.String("regexhost", "", "filter host with regex, ex: 'example.(com|org):443'")
+	regexURLArg := flag.String("regexurl", "", "filter URL with regex")
 
 	flag.Parse()
 
@@ -105,5 +108,6 @@ func main() {
 			logger.Error(fmt.Sprintf("%v", err4))
 		}
 	}
-	turtleproxy.Proxy(*addrArg, *useCertArg, *caRootArg, *verboseArg, *latencyArg, speedStart, speedEnd)
+
+	turtleproxy.Proxy(*addrArg, *useCertArg, *caRootArg, *verboseArg, *latencyArg, speedStart, speedEnd, *filterHostArg, *regexHostArg, *regexURLArg)
 }
